@@ -171,12 +171,12 @@ class Shikimori(
     }
 
     fun loadOAuth(): ShikimoriOAuth? =
-        try {
-            json.decodeFromString<ShikimoriOAuth>(trackPreferences.getTrackToken(this)!!)
-        } catch (e: Exception) {
-            logger.error(e) { "loadOAuth err" }
-            null
-        }
+    try {
+        json.decodeFromString<ShikimoriOAuth>(trackPreferences.getTrackToken(this)!!)
+    } catch (e: Exception) {
+        logger.error(e) { "loadOAuth err" }
+        null
+    }
 
     fun getUserId(): Int? = getUsername()?.toIntOrNull()
 

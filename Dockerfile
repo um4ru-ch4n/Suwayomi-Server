@@ -63,7 +63,7 @@ RUN groupadd --gid 1000 suwayomi && \
 WORKDIR /home/suwayomi
 
 # Copy the app into the container
-COPY server/build/Suwayomi-Server-v2.1.1911.jar /home/suwayomi/startup/tachidesk_latest.jar
+COPY server/build/Suwayomi-Server-*.jar /home/suwayomi/startup/tachidesk_latest.jar
 COPY scripts/create_server_conf.sh /home/suwayomi/create_server_conf.sh
 COPY scripts/startup_script.sh /home/suwayomi/startup_script.sh
 
