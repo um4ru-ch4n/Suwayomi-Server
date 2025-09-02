@@ -28,6 +28,7 @@ import okhttp3.RequestBody
 import java.io.IOException
 import suwayomi.tachidesk.manga.impl.track.tracker.model.Track
 import suwayomi.tachidesk.manga.impl.track.tracker.model.TrackSearch
+import suwayomi.tachidesk.manga.impl.track.tracker.TrackerManager
 import suwayomi.tachidesk.manga.impl.track.tracker.shikimori.dto.ShikimoriManga
 import suwayomi.tachidesk.manga.impl.track.tracker.shikimori.dto.ShikimoriOAuth
 import suwayomi.tachidesk.manga.impl.track.tracker.shikimori.dto.ShikimoriSearchData
@@ -433,7 +434,7 @@ class ShikimoriApi(
         }
 
     private fun ShikimoriManga.toTrackSearch(): TrackSearch =
-        TrackSearch().apply {
+        TrackSearch.create(TrackerManager.SHIKIMORI).apply {
             remote_id = this@toTrackSearch.id.toLong()
             library_id = this@toTrackSearch.userRate?.id?.toLong()
             title = this@toTrackSearch.name
