@@ -20,6 +20,7 @@ import suwayomi.tachidesk.graphql.types.SyncConflictInfoType
 import suwayomi.tachidesk.manga.impl.Chapter
 import suwayomi.tachidesk.manga.impl.chapter.getChapterDownloadReadyById
 import suwayomi.tachidesk.manga.impl.sync.KoreaderSyncService
+import suwayomi.tachidesk.manga.impl.track.Track
 import suwayomi.tachidesk.manga.model.table.ChapterMetaTable
 import suwayomi.tachidesk.manga.model.table.ChapterTable
 import suwayomi.tachidesk.server.JavalinSetup.Attribute
@@ -114,6 +115,18 @@ class ChapterMutation {
                     KoreaderSyncService.pushProgress(chapterId)
                 }
             }
+        }
+
+        // Auto-track progress when chapters are marked as read
+        if (patch.isRead != null) {
+            val mangaIds = transaction {
+                ChapterTable
+                    .selectAll()
+                    .where { ChapterTable.id inList ids }
+                    .map { it[ChapterTable.manga].value }
+                    .toSet()
+            }
+            Track.asyncTrackChapter(mangaIds)
         }
     }
 
