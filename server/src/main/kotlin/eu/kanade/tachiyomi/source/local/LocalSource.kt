@@ -295,7 +295,7 @@ class LocalSource(
         // Calculate volume start chapters for volume-based numbering
         val chapterNames = chapterFiles.map { 
             if (it.isDirectory) it.name else it.nameWithoutExtension 
-        }
+        }.toList()
         val volumeStartChapters = ChapterRecognition.calculateVolumeStartChapters(chapterNames)
         
         return chapterFiles.map { chapterFile ->
