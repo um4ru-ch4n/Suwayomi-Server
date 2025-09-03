@@ -285,38 +285,51 @@ class LocalSource(
     }
 
     // Chapters
-    override suspend fun getChapterList(manga: SManga): List<SChapter> =
-        fileSystem
+    override suspend fun getChapterList(manga: SManga): List<SChapter> {
+        val chapterFiles = fileSystem
             .getFilesInMangaDirectory(manga.url)
             // Only keep supported formats
             .filterNot { it.name.orEmpty().startsWith('.') }
             .filter { it.isDirectory || Archive.isSupported(it) }
-            .map { chapterFile ->
-                SChapter.create().apply {
-                    url = "${manga.url}/${chapterFile.name}"
-                    name =
-                        if (chapterFile.isDirectory) {
-                            chapterFile.name
-                        } else {
-                            chapterFile.nameWithoutExtension
-                        }
-                    date_upload = chapterFile.lastModified()
-                    chapter_number =
-                        ChapterRecognition
-                            .parseChapterNumber(manga.title, this.name, this.chapter_number.toDouble())
-                            .toFloat()
+        
+        // Calculate volume start chapters for volume-based numbering
+        val chapterNames = chapterFiles.map { 
+            if (it.isDirectory) it.name else it.nameWithoutExtension 
+        }
+        val volumeStartChapters = ChapterRecognition.calculateVolumeStartChapters(chapterNames)
+        
+        return chapterFiles.map { chapterFile ->
+            SChapter.create().apply {
+                url = "${manga.url}/${chapterFile.name}"
+                name =
+                    if (chapterFile.isDirectory) {
+                        chapterFile.name
+                    } else {
+                        chapterFile.nameWithoutExtension
+                    }
+                date_upload = chapterFile.lastModified()
+                chapter_number =
+                    ChapterRecognition
+                        .parseChapterNumberWithVolumes(
+                            manga.title, 
+                            this.name, 
+                            this.chapter_number.toDouble(),
+                            volumeStartChapters
+                        )
+                        .toFloat()
 
-                    val format = Format.valueOf(chapterFile)
-                    if (format is Format.Epub) {
-                        EpubFile(format.file).use { epub ->
-                            epub.fillChapterMetadata(this)
-                        }
+                val format = Format.valueOf(chapterFile)
+                if (format is Format.Epub) {
+                    EpubFile(format.file).use { epub ->
+                        epub.fillChapterMetadata(this)
                     }
                 }
-            }.sortedWith { c1, c2 ->
-                val c = c2.chapter_number.compareTo(c1.chapter_number)
-                if (c == 0) c2.name.compareToCaseInsensitiveNaturalOrder(c1.name) else c
-            }.toList()
+            }
+        }.sortedWith { c1, c2 ->
+            val c = c2.chapter_number.compareTo(c1.chapter_number)
+            if (c == 0) c2.name.compareToCaseInsensitiveNaturalOrder(c1.name) else c
+        }.toList()
+    }
 
     // Filters
     override fun getFilterList() = FilterList(OrderBy.Popular())

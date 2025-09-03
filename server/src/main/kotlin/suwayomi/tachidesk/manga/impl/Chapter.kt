@@ -164,10 +164,19 @@ object Chapter {
                     throw Exception("No chapters found")
                 }
 
-                // Recognize number for new chapters.
+                // Calculate volume start chapters for volume-based numbering
+                val chapterNames = uniqueChapters.map { it.name }
+                val volumeStartChapters = ChapterRecognition.calculateVolumeStartChapters(chapterNames)
+                
+                // Recognize number for new chapters with volume support
                 uniqueChapters.forEach { chapter ->
                     (source as? HttpSource)?.prepareNewChapter(chapter, sManga)
-                    val chapterNumber = ChapterRecognition.parseChapterNumber(manga.title, chapter.name, chapter.chapter_number.toDouble())
+                    val chapterNumber = ChapterRecognition.parseChapterNumberWithVolumes(
+                        manga.title, 
+                        chapter.name, 
+                        chapter.chapter_number.toDouble(),
+                        volumeStartChapters
+                    )
                     chapter.chapter_number = chapterNumber.toFloat()
                     chapter.name = chapter.name.sanitize(manga.title)
                     chapter.scanlator = chapter.scanlator?.ifBlank { null }?.trim()

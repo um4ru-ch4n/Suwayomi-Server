@@ -29,6 +29,112 @@ object ChapterRecognition {
      */
     private val unwantedWhiteSpace = Regex("""\s(?=extra|special|omake)""")
 
+    /**
+     * Regex patterns for volume and chapter recognition
+     * Supports both Russian (Том/Глава) and English (Volume/Chapter) formats
+     */
+    private val volumeChapterPatterns = listOf(
+        // Russian formats
+        Regex("""том\s*(\d+).*?глава\s*(\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""vol\.?\s*(\d+).*?ch\.?\s*(\d+)""", RegexOption.IGNORE_CASE),
+        // English formats  
+        Regex("""volume\s*(\d+).*?chapter\s*(\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""vol\.?\s*(\d+).*?chapter\s*(\d+)""", RegexOption.IGNORE_CASE),
+        // Mixed formats
+        Regex("""volume\s*(\d+).*?глава\s*(\d+)""", RegexOption.IGNORE_CASE),
+        Regex("""том\s*(\d+).*?chapter\s*(\d+)""", RegexOption.IGNORE_CASE)
+    )
+
+    /**
+     * Data class to hold volume and chapter information
+     */
+    data class VolumeChapterInfo(
+        val volumeNumber: Int,
+        val chapterNumber: Int
+    )
+
+    /**
+     * Parse volume and chapter numbers from chapter name
+     * @param chapterName The chapter name to parse
+     * @return VolumeChapterInfo if volume/chapter pattern is found, null otherwise
+     */
+    fun parseVolumeAndChapter(chapterName: String): VolumeChapterInfo? {
+        val cleanName = chapterName.lowercase().trim()
+        
+        for (pattern in volumeChapterPatterns) {
+            val match = pattern.find(cleanName)
+            if (match != null) {
+                val volumeNum = match.groupValues[1].toIntOrNull()
+                val chapterNum = match.groupValues[2].toIntOrNull()
+                if (volumeNum != null && chapterNum != null) {
+                    return VolumeChapterInfo(volumeNum, chapterNum)
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Calculate cumulative chapter numbers for volume-based chapters
+     * Based on the algorithm from convert_volumes_to_chapters.sh
+     * @param chapters List of chapter names to analyze
+     * @return Map of volume number to starting chapter number
+     */
+    fun calculateVolumeStartChapters(chapters: List<String>): Map<Int, Int> {
+        val volumeLastChapter = mutableMapOf<Int, Int>()
+        
+        // First pass: analyze all chapters to determine volume structure
+        for (chapterName in chapters) {
+            val volumeChapter = parseVolumeAndChapter(chapterName)
+            if (volumeChapter != null) {
+                val currentLast = volumeLastChapter[volumeChapter.volumeNumber] ?: 0
+                if (volumeChapter.chapterNumber > currentLast) {
+                    volumeLastChapter[volumeChapter.volumeNumber] = volumeChapter.chapterNumber
+                }
+            }
+        }
+        
+        // Second pass: calculate starting chapter numbers for each volume
+        val volumeStartChapter = mutableMapOf<Int, Int>()
+        var currentChapter = 1
+        
+        // Sort volumes by number
+        val sortedVolumes = volumeLastChapter.keys.sorted()
+        
+        for (volumeNum in sortedVolumes) {
+            volumeStartChapter[volumeNum] = currentChapter
+            currentChapter += volumeLastChapter[volumeNum] ?: 0
+        }
+        
+        return volumeStartChapter
+    }
+
+    /**
+     * Parse chapter number with volume support
+     * @param mangaTitle The manga title
+     * @param chapterName The chapter name
+     * @param chapterNumber Existing chapter number (if any)
+     * @param volumeStartChapters Map of volume numbers to their starting chapter numbers
+     * @return Parsed chapter number
+     */
+    fun parseChapterNumberWithVolumes(
+        mangaTitle: String,
+        chapterName: String,
+        chapterNumber: Double? = null,
+        volumeStartChapters: Map<Int, Int> = emptyMap()
+    ): Double {
+        // First try to parse as volume/chapter format
+        val volumeChapter = parseVolumeAndChapter(chapterName)
+        if (volumeChapter != null && volumeStartChapters.isNotEmpty()) {
+            val volumeStart = volumeStartChapters[volumeChapter.volumeNumber] ?: 1
+            val cumulativeChapterNumber = volumeStart + volumeChapter.chapterNumber - 1
+            return cumulativeChapterNumber.toDouble()
+        }
+        
+        // Fall back to original parsing logic
+        return parseChapterNumber(mangaTitle, chapterName, chapterNumber)
+    }
+
     fun parseChapterNumber(
         mangaTitle: String,
         chapterName: String,
