@@ -1,9 +1,10 @@
 #!/bin/bash
 
-# Script to convert volume-based chapter numbering to sequential chapter numbering
+# Advanced script to convert volume-based chapter numbering to sequential chapter numbering
 # Format: "Chapter N - Title" where N is calculated from volume and chapter numbers
 # Supports both Russian (Том/Глава) and English (Volume/Chapter) formats
-# Usage: ./convert_volumes_to_chapters.sh [path_to_manga_folder]
+# Handles missing volumes by asking user for starting chapter numbers
+# Usage: ./convert_volumes_to_chapters_advanced.sh [path_to_manga_folder]
 
 # Get the target directory from command line argument or use current directory
 TARGET_DIR="${1:-.}"
@@ -17,7 +18,7 @@ if [ ! -d "$TARGET_DIR" ]; then
     exit 1
 fi
 
-echo "Starting volume-to-chapter conversion process..."
+echo "Starting advanced volume-to-chapter conversion process..."
 echo "Target directory: $TARGET_DIR"
 echo "=============================================="
 
@@ -48,6 +49,11 @@ for folder in *; do
             volume_num="${BASH_REMATCH[1]}"
             chapter_num="${BASH_REMATCH[2]}"
             echo "  Found English format: Volume $volume_num, Chapter $chapter_num"
+        # Try abbreviated English format: Vol. X ... Ch. Y
+        elif [[ $folder =~ Vol\.?\s*([0-9]+).*Ch\.?\s*([0-9]+) ]]; then
+            volume_num="${BASH_REMATCH[1]}"
+            chapter_num="${BASH_REMATCH[2]}"
+            echo "  Found abbreviated English format: Volume $volume_num, Chapter $chapter_num"
         else
             echo "  Skipping: No volume/chapter pattern found"
             continue
@@ -70,39 +76,80 @@ echo ""
 echo "Volume analysis results:"
 echo "========================"
 
-# Calculate cumulative chapter numbers for each volume
-declare -A volume_start_chapter
-current_chapter=1
-
 # Get the minimum and maximum volume numbers
 min_volume=$(printf '%s\n' "${!volume_last_chapter[@]}" | sort -n | head -1)
 max_volume=$(printf '%s\n' "${!volume_last_chapter[@]}" | sort -n | tail -1)
 
 echo "Volume range: $min_volume to $max_volume"
 
-# Check for missing volumes and warn user
-if [ "$min_volume" -gt 1 ]; then
-    echo ""
-    echo "WARNING: Volume 1 is missing! Starting from Volume $min_volume"
-    echo "This means the numbering will start from Chapter 1, which might not be correct."
-    echo "If you know how many chapters were in the missing volumes, you can manually adjust the starting number."
-    echo ""
-    read -p "Enter the starting chapter number (or press Enter to start from 1): " user_start
-    if [[ -n "$user_start" && "$user_start" =~ ^[0-9]+$ ]]; then
-        current_chapter=$user_start
-        echo "Using custom starting chapter: $current_chapter"
-    else
-        echo "Using default starting chapter: $current_chapter"
-    fi
-    echo ""
-fi
+# Check for missing volumes and ask user for starting chapter numbers
+declare -A volume_start_chapter
+current_chapter=1
 
-# Sort volumes by number and calculate starting chapters
+echo ""
+echo "Checking for missing volumes and determining starting chapter numbers..."
+echo "======================================================================"
+
+# Process volumes in order
 for volume_num in $(printf '%s\n' "${!volume_last_chapter[@]}" | sort -n); do
-    volume_start_chapter[$volume_num]=$current_chapter
-    echo "Volume $volume_num: Chapters 1-${volume_last_chapter[$volume_num]} (Total: ${volume_chapter_count[$volume_num]} chapters)"
-    echo "  Will be converted to chapters: $current_chapter-$((current_chapter + volume_last_chapter[$volume_num] - 1))"
-    current_chapter=$((current_chapter + volume_last_chapter[$volume_num]))
+    echo ""
+    echo "Processing Volume $volume_num..."
+    
+    # Check if this volume has a gap from the previous one
+    if [ "$volume_num" -gt 1 ]; then
+        prev_volume=$((volume_num - 1))
+        
+        # Check if previous volume exists
+        if [[ -z "${volume_last_chapter[$prev_volume]}" ]]; then
+            echo "  WARNING: Volume $prev_volume is missing!"
+            echo "  This creates a gap in the sequence."
+        fi
+    fi
+    
+    # Ask user for starting chapter number for this volume
+    echo "  Volume $volume_num has chapters 1-${volume_last_chapter[$volume_num]} (${volume_chapter_count[$volume_num]} total)"
+    
+    if [ "$volume_num" -eq "$min_volume" ] && [ "$min_volume" -gt 1 ]; then
+        echo "  This is the first available volume, but Volume 1 is missing."
+        echo "  You need to specify the starting chapter number for this volume."
+    elif [ "$volume_num" -gt 1 ] && [[ -z "${volume_last_chapter[$((volume_num - 1))]}" ]]; then
+        echo "  The previous volume is missing, so you need to specify the starting chapter number."
+    else
+        echo "  Suggested starting chapter: $current_chapter"
+    fi
+    
+    # Get user input for starting chapter
+    while true; do
+        read -p "  Enter starting chapter number for Volume $volume_num (or press Enter for suggested): " user_start
+        
+        if [[ -z "$user_start" ]]; then
+            # Use suggested number
+            volume_start_chapter[$volume_num]=$current_chapter
+            echo "  Using suggested starting chapter: $current_chapter"
+            break
+        elif [[ "$user_start" =~ ^[0-9]+$ ]]; then
+            # Use user input
+            volume_start_chapter[$volume_num]=$user_start
+            echo "  Using custom starting chapter: $user_start"
+            break
+        else
+            echo "  Invalid input. Please enter a number or press Enter for suggested value."
+        fi
+    done
+    
+    # Update current_chapter for next volume
+    current_chapter=$((volume_start_chapter[$volume_num] + volume_last_chapter[$volume_num]))
+done
+
+echo ""
+echo "Final volume mapping:"
+echo "===================="
+
+# Show final mapping
+for volume_num in $(printf '%s\n' "${!volume_last_chapter[@]}" | sort -n); do
+    start_chapter=${volume_start_chapter[$volume_num]}
+    end_chapter=$((start_chapter + volume_last_chapter[$volume_num] - 1))
+    echo "Volume $volume_num: Chapters 1-${volume_last_chapter[$volume_num]} -> Chapters $start_chapter-$end_chapter"
 done
 
 echo ""
@@ -133,6 +180,12 @@ for folder in *; do
             chapter_num="${BASH_REMATCH[2]}"
             title="${BASH_REMATCH[3]}"
             echo "  English format: Volume $volume_num, Chapter $chapter_num, Title: $title"
+        # Try abbreviated English format: Vol. X ... Ch. Y - Title
+        elif [[ $folder =~ Vol\.?\s*([0-9]+).*Ch\.?\s*([0-9]+)\ -\ (.+) ]]; then
+            volume_num="${BASH_REMATCH[1]}"
+            chapter_num="${BASH_REMATCH[2]}"
+            title="${BASH_REMATCH[3]}"
+            echo "  Abbreviated English format: Volume $volume_num, Chapter $chapter_num, Title: $title"
         else
             echo "  Skipping: No recognized volume/chapter pattern"
             continue
@@ -171,8 +224,11 @@ echo "Conversion completed!"
 echo "Successfully converted: $success_count folders"
 echo "Errors: $error_count folders"
 echo ""
+echo "Advanced features used:"
+echo "- Detected missing volumes in the sequence"
+echo "- Asked for custom starting chapter numbers"
+echo "- Handled gaps in volume numbering"
+echo ""
 echo "New chapter numbering:"
-echo "- Each volume's chapters are now numbered sequentially"
-echo "- Volume 1, Chapter 1 -> Chapter 001"
-echo "- Volume 2, Chapter 1 -> Chapter (last_chapter_of_vol1 + 1)"
-echo "- And so on..."
+echo "- Each volume's chapters are numbered sequentially based on your input"
+echo "- Missing volumes are accounted for with custom starting numbers"

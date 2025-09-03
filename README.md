@@ -21,6 +21,7 @@
     - [Debian/Ubuntu](#debianubuntu)
     - [NixOS](#nixos)
   - [Advanced Methods](#advanced-methods)
+    - [Volume to Chapter Conversion Script](#volume-to-chapter-conversion-script)
     - [Running the jar release directly](#running-the-jar-release-directly)
     - [Using Suwayomi Remotely](#using-suwayomi-remotely)
   - [Syncing With Mihon (Tachiyomi) and Neko](#syncing-with-mihon-tachiyomi-and-neko)
@@ -165,6 +166,67 @@ For more information, see [the NixOS manual](https://nixos.org/manual/nixos/stab
 You can also directly use the package from [nixpkgs](https://search.nixos.org/packages?channel=unstable&type=packages&query=suwayomi-server).
 
 ## Advanced Methods
+### Volume to Chapter Conversion Script
+For manga collections organized by volumes (e.g., "Volume 1 Chapter 1", "Volume 2 Chapter 1"), Suwayomi provides a script to convert volume-based chapter numbering to sequential chapter numbering.
+
+The `convert_volumes_to_chapters.sh` script helps reorganize manga folders from volume-based structure to sequential chapter numbering, making it easier for Suwayomi to properly track and navigate chapters.
+
+#### Features
+- **Multi-language support**: Handles both Russian (Том/Глава) and English (Volume/Chapter) formats
+- **Missing volume detection**: Automatically detects gaps in volume sequences
+- **Interactive configuration**: Prompts for custom starting chapter numbers when volumes are missing
+- **Smart numbering**: Calculates cumulative chapter numbers (e.g., Volume 1: Chapters 1-100, Volume 2: Chapters 101-200)
+
+#### Usage
+```bash
+# Convert manga in current directory
+./scripts/convert_volumes_to_chapters.sh
+
+# Convert manga in specific directory
+./scripts/convert_volumes_to_chapters.sh /path/to/manga/folder
+```
+
+#### Supported Formats
+- `Том 1 Глава 5 - Title` (Russian)
+- `Volume 1 Chapter 5 - Title` (English)
+- `Vol.1 Ch.5 - Title` (Abbreviated English)
+
+#### Example
+
+**Case 1: All volumes present**
+**Before:**
+```
+Volume 1 Chapter 1 - Beginning
+Volume 1 Chapter 2 - Development
+Volume 2 Chapter 1 - New Arc
+Volume 2 Chapter 2 - Conflict
+```
+
+**After:**
+```
+Chapter 001 - Beginning
+Chapter 002 - Development
+Chapter 003 - New Arc
+Chapter 004 - Conflict
+```
+
+**Case 2: First volume missing (Volume 1 absent)**
+**Before:**
+```
+Volume 2 Chapter 1 - New Arc
+Volume 2 Chapter 2 - Conflict
+```
+
+**Script will ask:** "What chapter number should the current volume start from?" → You enter: `101`
+
+**After:**
+```
+Chapter 101 - New Arc
+Chapter 102 - Conflict
+```
+
+The script automatically detects that Volume 1 has 100 chapters and starts Volume 2 from chapter 101. 
+
 ### Running the jar release directly
 In order to run the app you need the following:
 - The jar release of Suwayomi-Server
