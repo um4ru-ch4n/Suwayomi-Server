@@ -423,6 +423,12 @@ object WebInterfaceManager {
             KotlinLogging.logger("${logger.name} isLocalWebUIValid(flavor= ${flavor.uiName}, path= $path)")
         log.info { "Verifying WebUI files..." }
 
+        // Skip MD5 validation if auto-updates are disabled
+        if (!isAutoUpdateEnabled()) {
+            log.info { "Auto-updates disabled, skipping MD5 validation" }
+            return true
+        }
+
         val currentVersion = getLocalVersion(path)
         val localMD5Sum = getLocalMD5Sum(path)
         val currentVersionMD5Sum = fetchMD5SumFor(flavor, currentVersion)
