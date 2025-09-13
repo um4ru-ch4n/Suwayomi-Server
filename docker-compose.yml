@@ -19,7 +19,8 @@ services:
       - AUTO_DOWNLOAD_CHAPTERS=false
       - UPDATE_MANGA_INFO=true
       # Disable KCEF to avoid segfaults
-      - WEB_UI_FLAVOR=WEBUI
+      # - WEB_UI_FLAVOR=WEBUI
+      - WEB_UI_UPDATE_INTERVAL=0
 #  #################################################################################################
 #
 #    !!! IMPORTANT !!!
